@@ -1,5 +1,0 @@
-Context,Winner(s),Loser(s)
-C1,UCB,"DQN, PG"
-C2,UCB,"DQN, PG"
-C3,"DQN, UCB",PG
-C4,UCB,"DQN, PG"
