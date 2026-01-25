@@ -1,55 +1,33 @@
-# # Run with: uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-
-
+# # # Run with: uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # from fastapi import FastAPI, HTTPException
 # from pydantic import BaseModel
-# from typing import Optional, Dict
+# from typing import List, Optional, Dict
 # from data_loader import load_and_process_data
 # from rl_agents import UCBAgent, DQNAgent, PolicyGradientAgent, STATE_SIZE
-# from typing import List
 
 # app = FastAPI()
 
 # # --- Global Data Store ---
-# MEAL_DATA = {} # Will hold {"Breakfast": [...], "Lunch": [...]}
-# USER_AGENTS: Dict[str, Dict] = {} # { "user_123": { "ucb": agent, "dqn": agent... } }
+# MEAL_DATA = {} 
+# USER_AGENTS: Dict[str, Dict] = {} 
 
-# # --- Startup Event ---
 # @app.on_event("startup")
 # def load_data():
 #     global MEAL_DATA
-#     # Ensure your CSV is at backend/data/food_data.csv
 #     MEAL_DATA = load_and_process_data("data/food_data.csv")
 
-# # --- Helper to Get/Create User Agent ---
 # def get_user_agent(user_id: str, algorithm: str, meal_type: str):
-#     # Create user entry if not exists
-#     if user_id not in USER_AGENTS:
-#         USER_AGENTS[user_id] = {}
-    
-#     # Key for the specific agent (e.g., "ucb_Breakfast")
-#     # We need separate agents for Breakfast vs Lunch because the food lists are different!
+#     if user_id not in USER_AGENTS: USER_AGENTS[user_id] = {}
 #     agent_key = f"{algorithm}_{meal_type}"
-    
 #     if agent_key not in USER_AGENTS[user_id]:
-#         # Initialize new agent
 #         action_list = MEAL_DATA.get(meal_type, [])
-#         if not action_list:
-#             # Fallback if list empty
-#             action_list = [{"name": "Standard Meal", "calories": 500}]
-
-#         if algorithm == "ucb":
-#             USER_AGENTS[user_id][agent_key] = UCBAgent(action_list)
-#         elif algorithm == "dqn":
-#             USER_AGENTS[user_id][agent_key] = DQNAgent(STATE_SIZE, action_list)
-#         elif algorithm == "pg":
-#             USER_AGENTS[user_id][agent_key] = PolicyGradientAgent(STATE_SIZE, action_list)
-            
+#         if not action_list: action_list = [{"name": "Standard Meal", "calories": 500}]
+#         if algorithm == "ucb": USER_AGENTS[user_id][agent_key] = UCBAgent(action_list)
+#         elif algorithm == "dqn": USER_AGENTS[user_id][agent_key] = DQNAgent(STATE_SIZE, action_list)
+#         elif algorithm == "pg": USER_AGENTS[user_id][agent_key] = PolicyGradientAgent(STATE_SIZE, action_list)
 #     return USER_AGENTS[user_id][agent_key]
 
-# # --- Data Models ---
 # class StateInput(BaseModel):
 #     user_id: str
 #     time_of_day: float 
@@ -61,10 +39,11 @@
 #     meal_name: str
 #     calories: float
 #     protein: float
-#     fat: float             # <--- NEW
-#     carbs: float           # <--- NEW
-#     cholesterol: float     # <--- NEW
-#     micros: List[str]      # <--- NEW
+#     fat: float
+#     carbs: float
+#     cholesterol: float
+#     micros: List[str]
+#     serving_size: str    # <--- NEW FIELD
 #     meal_id: int
 #     meal_type: str
 #     algorithm_used: str
@@ -72,51 +51,39 @@
 # class FeedbackInput(BaseModel):
 #     user_id: str
 #     algorithm: str
-#     meal_type: str # "Breakfast", "Lunch", etc.
+#     meal_type: str
 #     meal_id: int
 #     reward: float 
 #     state: Optional[StateInput] = None
 #     next_state: Optional[StateInput] = None 
 
-# # --- API Endpoints ---
-
 # @app.post("/recommend/{algorithm}", response_model=RecommendationResponse)
 # def get_recommendation(algorithm: str, state: StateInput):
 #     algo_name = algorithm.lower()
-    
-#     # Determine Meal Type based on Time of Day
-#     # 0.0-0.25 (Morning), 0.25-0.5 (Lunch), 0.5-0.75 (Snack), 0.75-1.0 (Dinner)
 #     if state.time_of_day < 0.25: meal_type = "Breakfast"
 #     elif state.time_of_day < 0.50: meal_type = "Lunch"
 #     elif state.time_of_day < 0.75: meal_type = "Snack"
 #     else: meal_type = "Dinner"
     
-#     # Get the specific agent for this User + Algo + MealType
 #     agent = get_user_agent(state.user_id, algo_name, meal_type)
-    
-#     # Select Action
 #     state_vector = [state.time_of_day, state.calorie_goal, state.current_calories, state.is_workout_day]
     
-#     if algo_name == "ucb":
-#         action_idx = agent.select_action()
-#     else:
-#         action_idx = agent.select_action(state_vector)
+#     if algo_name == "ucb": action_idx = agent.select_action()
+#     else: action_idx = agent.select_action(state_vector)
     
-#     # Retrieve Food Details
 #     food_list = agent.actions
-#     # Safety check
 #     if action_idx >= len(food_list): action_idx = 0
-    
-#     selected_food = food_list[action_idx]
+#     selected = food_list[action_idx]
     
 #     return {
-#         "meal_name": selected_food["name"],
-#         "calories": selected_food["calories"],
-#         "protein": selected_food["protein"],
-#         "fat": selected_food.get("fat", 0),                 # <--- Fetch NEW Data
-#         "carbs": selected_food.get("carbs", 0),             # <--- Fetch NEW Data
-#         "cholesterol": selected_food.get("cholesterol", 0), # <--- Fetch NEW Data
-#         "micros": selected_food.get("micros", []),          # <--- Fetch NEW Data
+#         "meal_name": selected["name"],
+#         "calories": selected["calories"],
+#         "protein": selected["protein"],
+#         "fat": selected.get("fat", 0),
+#         "carbs": selected.get("carbs", 0),
+#         "cholesterol": selected.get("cholesterol", 0),
+#         "micros": selected.get("micros", []),
+#         "serving_size": selected.get("serving_size", "1 serving"), # <--- Send to App
 #         "meal_id": action_idx,
 #         "meal_type": meal_type,
 #         "algorithm_used": algo_name
@@ -130,30 +97,17 @@
 #     if algo_name == "ucb":
 #         agent.update(feedback.meal_id, feedback.reward)
 #         return {"status": "UCB Updated"}
-        
 #     if feedback.state:
-#         state_vector = [
-#             feedback.state.time_of_day, 
-#             feedback.state.calorie_goal, 
-#             feedback.state.current_calories, 
-#             feedback.state.is_workout_day
-#         ]
-        
+#         state_vec = [feedback.state.time_of_day, feedback.state.calorie_goal, feedback.state.current_calories, feedback.state.is_workout_day]
 #         if algo_name == "dqn" and feedback.next_state:
-#             next_state_vector = [
-#                 feedback.next_state.time_of_day, 
-#                 feedback.next_state.calorie_goal, 
-#                 feedback.next_state.current_calories, 
-#                 feedback.next_state.is_workout_day
-#             ]
-#             agent.update(state_vector, feedback.meal_id, feedback.reward, next_state_vector)
+#             next_vec = [feedback.next_state.time_of_day, feedback.next_state.calorie_goal, feedback.next_state.current_calories, feedback.next_state.is_workout_day]
+#             agent.update(state_vec, feedback.meal_id, feedback.reward, next_vec)
 #             return {"status": "DQN Updated"}
-            
 #         elif algo_name == "pg":
 #             agent.update(feedback.reward)
 #             return {"status": "PG Updated"}
-            
 #     return {"status": "Feedback received"}
+
 
 
 
@@ -177,16 +131,57 @@ def load_data():
     global MEAL_DATA
     MEAL_DATA = load_and_process_data("data/food_data.csv")
 
-def get_user_agent(user_id: str, algorithm: str, meal_type: str):
+# --- NEW: Helper to filter foods & get specific agent ---
+def get_user_agent_and_food_list(user_id, algorithm, meal_type, is_veg_only, allergies):
+    # 1. Get raw list for this meal type
+    raw_list = MEAL_DATA.get(meal_type, [])
+    
+    # 2. Filter based on Veg preference and Allergies
+    filtered_list = []
+    for food in raw_list:
+        # Check Veg Constraint
+        if is_veg_only and not food["is_veg"]:
+            continue
+            
+        # Check Allergies (Basic string matching)
+        has_allergy = False
+        if allergies:
+            food_name_lower = food["name"].lower()
+            for allergen in allergies:
+                if allergen.lower() in food_name_lower:
+                    has_allergy = True
+                    break
+        
+        if not has_allergy:
+            filtered_list.append(food)
+
+    # Fallback if filter removes everything
+    if not filtered_list:
+        filtered_list = [{"name": "No matching food", "calories": 0, "protein": 0, "is_veg": True}]
+
+    # 3. Get/Create Agent
+    # We create a unique agent for "Veg" mode so it doesn't conflict with "Mixed" mode
     if user_id not in USER_AGENTS: USER_AGENTS[user_id] = {}
-    agent_key = f"{algorithm}_{meal_type}"
+    
+    mode_suffix = "Veg" if is_veg_only else "All"
+    agent_key = f"{algorithm}_{meal_type}_{mode_suffix}"
+    
     if agent_key not in USER_AGENTS[user_id]:
-        action_list = MEAL_DATA.get(meal_type, [])
-        if not action_list: action_list = [{"name": "Standard Meal", "calories": 500}]
-        if algorithm == "ucb": USER_AGENTS[user_id][agent_key] = UCBAgent(action_list)
-        elif algorithm == "dqn": USER_AGENTS[user_id][agent_key] = DQNAgent(STATE_SIZE, action_list)
-        elif algorithm == "pg": USER_AGENTS[user_id][agent_key] = PolicyGradientAgent(STATE_SIZE, action_list)
-    return USER_AGENTS[user_id][agent_key]
+        if algorithm == "ucb": 
+            USER_AGENTS[user_id][agent_key] = UCBAgent(filtered_list)
+        elif algorithm == "dqn": 
+            USER_AGENTS[user_id][agent_key] = DQNAgent(STATE_SIZE, filtered_list)
+        elif algorithm == "pg": 
+            USER_AGENTS[user_id][agent_key] = PolicyGradientAgent(STATE_SIZE, filtered_list)
+    else:
+        # Update action list in case data changed (Optional safety)
+        if hasattr(USER_AGENTS[user_id][agent_key], 'actions'):
+             USER_AGENTS[user_id][agent_key].actions = filtered_list
+             USER_AGENTS[user_id][agent_key].action_size = len(filtered_list)
+             if hasattr(USER_AGENTS[user_id][agent_key], 'n_actions'):
+                 USER_AGENTS[user_id][agent_key].n_actions = len(filtered_list)
+
+    return USER_AGENTS[user_id][agent_key], filtered_list
 
 class StateInput(BaseModel):
     user_id: str
@@ -194,6 +189,8 @@ class StateInput(BaseModel):
     calorie_goal: float 
     current_calories: float 
     is_workout_day: float 
+    is_veg_only: bool = False       # <--- NEW
+    allergies: List[str] = []       # <--- NEW
 
 class RecommendationResponse(BaseModel):
     meal_name: str
@@ -203,7 +200,8 @@ class RecommendationResponse(BaseModel):
     carbs: float
     cholesterol: float
     micros: List[str]
-    serving_size: str    # <--- NEW FIELD
+    serving_size: str
+    is_veg: bool                    # <--- NEW
     meal_id: int
     meal_type: str
     algorithm_used: str
@@ -220,18 +218,24 @@ class FeedbackInput(BaseModel):
 @app.post("/recommend/{algorithm}", response_model=RecommendationResponse)
 def get_recommendation(algorithm: str, state: StateInput):
     algo_name = algorithm.lower()
+    
     if state.time_of_day < 0.25: meal_type = "Breakfast"
     elif state.time_of_day < 0.50: meal_type = "Lunch"
     elif state.time_of_day < 0.75: meal_type = "Snack"
     else: meal_type = "Dinner"
     
-    agent = get_user_agent(state.user_id, algo_name, meal_type)
+    # Use new helper to get filtered agent and list
+    agent, food_list = get_user_agent_and_food_list(
+        state.user_id, algo_name, meal_type, state.is_veg_only, state.allergies
+    )
+    
     state_vector = [state.time_of_day, state.calorie_goal, state.current_calories, state.is_workout_day]
     
-    if algo_name == "ucb": action_idx = agent.select_action()
-    else: action_idx = agent.select_action(state_vector)
+    if algo_name == "ucb": 
+        action_idx = agent.select_action()
+    else: 
+        action_idx = agent.select_action(state_vector)
     
-    food_list = agent.actions
     if action_idx >= len(food_list): action_idx = 0
     selected = food_list[action_idx]
     
@@ -243,7 +247,8 @@ def get_recommendation(algorithm: str, state: StateInput):
         "carbs": selected.get("carbs", 0),
         "cholesterol": selected.get("cholesterol", 0),
         "micros": selected.get("micros", []),
-        "serving_size": selected.get("serving_size", "1 serving"), # <--- Send to App
+        "serving_size": selected.get("serving_size", "1 serving"),
+        "is_veg": selected.get("is_veg", True),  # <--- Return Flag
         "meal_id": action_idx,
         "meal_type": meal_type,
         "algorithm_used": algo_name
@@ -252,11 +257,22 @@ def get_recommendation(algorithm: str, state: StateInput):
 @app.post("/feedback")
 def submit_feedback(feedback: FeedbackInput):
     algo_name = feedback.algorithm.lower()
-    agent = get_user_agent(feedback.user_id, algo_name, feedback.meal_type)
     
+    # Must retrieve the correct filtered agent to update
+    if feedback.state:
+        agent, _ = get_user_agent_and_food_list(
+            feedback.user_id, algo_name, feedback.meal_type,
+            feedback.state.is_veg_only, feedback.state.allergies
+        )
+    else:
+        # Fallback if state not provided (shouldn't happen with new app code)
+        # We try to get the 'All' agent by default
+        agent, _ = get_user_agent_and_food_list(feedback.user_id, algo_name, feedback.meal_type, False, [])
+
     if algo_name == "ucb":
         agent.update(feedback.meal_id, feedback.reward)
         return {"status": "UCB Updated"}
+        
     if feedback.state:
         state_vec = [feedback.state.time_of_day, feedback.state.calorie_goal, feedback.state.current_calories, feedback.state.is_workout_day]
         if algo_name == "dqn" and feedback.next_state:
@@ -266,4 +282,5 @@ def submit_feedback(feedback: FeedbackInput):
         elif algo_name == "pg":
             agent.update(feedback.reward)
             return {"status": "PG Updated"}
+            
     return {"status": "Feedback received"}
